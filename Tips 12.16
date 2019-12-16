@@ -1,0 +1,258 @@
+Today , We are going to test , About four hour later , The test is ending , I Think i'm not smart to slove question , It's very stupid to use 
+
+a method to slove;
+
+Too much interface to implements 
+
+
+private void getAllProduce(){
+
+        String url = "http://192.168.31.222:8085/dataInterface/WorkPost/getAll";
+
+        JsonObjectRequest jor = new JsonObjectRequest(url, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject jsonObject) {
+                Toast.makeText(Sm4.this, "查询成功！", Toast.LENGTH_SHORT).show();
+                JSONArray array = jsonObject.optJSONArray("data");
+                //这里有多条线路，所以要多次查询
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject jsonObject1 = array.optJSONObject(i);
+                    getPeople(jsonObject1.optInt("productionLineInfoId"));
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+
+            }
+        });
+        Volley.newRequestQueue(getApplicationContext()).add(jor);
+    }
+
+    private void getPeople(int id){
+        //根据学生生产线查询
+        String url = "http://192.168.0.104:8085/dataInterface/WorkPost/getInfo";
+        StringRequest stringRequest = new StringRequest(Request.Method.POST , url , new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                //我在这里是将所有的生产线中的一条ID里面的所有数据查出来，
+                // 接下来要根据这里所有的数据中的一条数据去查询people的名字
+                people = new Gson().fromJson(s.toString(), People.class);
+                sm_4_gr.setAdapter(new MyAdapter());
+                for (int i = 0; i < people.getData().size(); i++) {
+                    int status = people.getData().get(i).getStadius();
+                    people.getData().get(i).setConsume(100 - people.getData().get(i).getConsume());
+                    getPersonNames(status , people.getData().get(i) , i);
+                }
+
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String > map = new HashMap<>();
+                map.put("productionLineInfoId",id+"");
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(stringRequest);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    class MyAdapter extends BaseAdapter{
+
+        @Override
+        public int getCount() {
+            return people.getData().size();
+        }
+
+        @Override
+        public Object getItem(int i) {
+            return null;
+        }
+
+        @Override
+        public long getItemId(int i) {
+            return 0;
+        }
+
+        @Override
+        public View getView(int position, View context, ViewGroup viewGroup) {
+
+            if(context == null){
+                context = getLayoutInflater().inflate(R.layout.sm_4_item,null);
+            }
+            /**
+             *                sm_2_one_name , sm_2_one_tili,
+             *             sm_2_two_name , sm_2_two_tili,
+             *             sm_2_three_name , sm_2_three_tili,
+             *             sm_2_four_name , sm_2_four_tili;
+             */
+            TextView sm_2_one_name = context.findViewById(R.id.sm_2_one);
+            TextView sm_2_one_tili = context.findViewById(R.id.sm_2_one_tili);
+            TextView sm_2_two_name = context.findViewById(R.id.sm_2_two_name);
+            TextView sm_2_two_tili = context.findViewById(R.id.sm_2_two_tili);
+            TextView sm_2_three_name = context.findViewById(R.id.sm_2_three_name);
+            TextView sm_2_three_tili = context.findViewById(R.id.sm_2_three_tili);
+            TextView sm_2_four_name = context.findViewById(R.id.sm_2_four_name);
+            TextView sm_2_four_tili = context.findViewById(R.id.sm_2_four_tili);
+
+            RelativeLayout sm_2_one = context.findViewById(R.id.sm_2_one);
+            RelativeLayout sm_2_two = context.findViewById(R.id.sm_2_two);
+            RelativeLayout sm_2_three = context.findViewById(R.id.sm_2_three);
+            RelativeLayout sm_2_four = context.findViewById(R.id.sm_2_four);
+
+
+
+            sm_2_one.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+
+                }
+            });
+
+            sm_2_two.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+
+                }
+            });
+
+            sm_2_three.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+
+                }
+            });
+
+            sm_2_four.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+
+                }
+            });
+
+            People.Person person = people.getData().get(position);
+            //这个需要存到实体类
+            switch (person.getStadius()){
+                case 0:
+                    sm_2_one_name.setText("姓名："+person.getPersonName());
+                    sm_2_one_tili.setText("体力："+person.getConsume());
+                    break;
+                case 1:
+                    sm_2_two_name.setText("姓名："+person.getPersonName());
+                    sm_2_two_tili.setText("体力："+person.getConsume());
+                    break;
+                case 2:
+                    sm_2_three_name.setText("姓名："+person.getPersonName());
+                    sm_2_three_tili.setText("体力："+person.getConsume());
+                    break;
+                case 3:
+                    sm_2_four_name.setText("姓名："+person.getPersonName());
+                    sm_2_four_tili.setText("体力："+person.getConsume());
+                    break;
+            }
+            return context;
+        }
+    }
+
+    private void getPersonNames(int status, People.Person person , int position){
+
+        String url = "http://192.168.0.104:8085/dataInterface/People/search";
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                try {
+                    JSONObject jsonObject = new JSONObject(s);
+                    JSONArray array = jsonObject.optJSONArray("data");
+                    //根据status 查找员工
+                    JSONObject jsonObject1 = array.optJSONObject(position);
+                    people.getData().get(position).setPersonName(jsonObject1.optString("peopleName"));
+                    //person.setPersonName();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String , String> map = new HashMap<>();
+                map.put("status" , status+"");
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(stringRequest);
+    }
+    class People{
+        List<Person> data;
+
+        public List<Person> getData() {
+            return data;
+        }
+
+        public void setData(List<Person> data) {
+            this.data = data;
+        }
+
+        class Person{
+            String workPostName;
+            int productionLineInfoId;
+            int stadius;
+            int consume;
+            String personName;
+
+            public String getPersonName() {
+                return personName;
+            }
+
+            public void setPersonName(String personName) {
+                this.personName = personName;
+            }
+
+            public String getWorkPostName() {
+                return workPostName;
+            }
+
+            public void setWorkPostName(String workPostName) {
+                this.workPostName = workPostName;
+            }
+
+            public int getProductionLineInfoId() {
+                return productionLineInfoId;
+            }
+
+            public void setProductionLineInfoId(int productionLineInfoId) {
+                this.productionLineInfoId = productionLineInfoId;
+            }
+
+            public int getStadius() {
+                return stadius;
+            }
+
+            public void setStadius(int stadius) {
+                this.stadius = stadius;
+            }
+
+            public int getConsume() {
+                return consume;
+            }
+
+            public void setConsume(int consume) {
+                this.consume = consume;
+            }
+        }
+    }
