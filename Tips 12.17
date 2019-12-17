@@ -1,0 +1,303 @@
+!Rubbish
+
+
+package com.lenovo.smarttraffic.ui.activity;
+
+import android.os.Bundle;
+import android.support.annotation.Nullable;
+import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
+import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.github.mikephil.charting.charts.BarChart;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.data.BarData;
+import com.github.mikephil.charting.data.BarDataSet;
+import com.github.mikephil.charting.data.BarEntry;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.google.gson.Gson;
+import com.lenovo.smarttraffic.R;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author Amoly
+ * @date 2019/4/11.
+ * description：
+ */
+
+public class Sm7 extends BaseActivity{
+    private ListView sm_7_list;
+    private MyAdapter myAdapter;
+    private  MyFixCar myFixCar;
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        InitView();
+        InitData();
+    }
+    @Override
+    protected int getLayout() {
+        return R.layout.sm_7;
+    }
+
+    private void InitView() {
+        initToolBar(findViewById(R.id.toolbar), true, getString(R.string.item7));
+        sm_7_list = findViewById(R.id.sm_7_list);
+    }
+
+    private void InitData() {
+
+        //首先查询全部有问题的车辆的仓库 -----》获取到ID   http://192.168.31.222:8085/dataInterface/UserQuestion/getAll
+        // 然后 ， 根据ID查询全部 车辆 描述啊，什么的     http://192.168.31.222:8085/dataInterface/Car/getInfo{ id ,} 这里传的就是carid
+        //  名称根据 http://192.168.31.222:8085/dataInterface/ProductionLine/search {id} 根据carID查询 所有信息
+        // 最后查一个维修资金 http://192.168.31.222:8085/dataInterface/CarInfo/getInfo
+
+        String url = "http://192.168.0.101:8085/dataInterface/UserQuestion/getAll";
+
+        JsonObjectRequest jor = new JsonObjectRequest(url, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject jsonObject) {
+                Toast.makeText(Sm7.this, "成功!", Toast.LENGTH_SHORT).show();
+                myFixCar = new Gson().fromJson(jsonObject.toString(), MyFixCar.class);
+        
+//                for (int k = 0; k < myFixCar.getData().size() -1 ; k++) {
+//                    for (int l = 0; l < myFixCar.getData().size(); l++) {
+//                        if(myFixCar.getData().get(k).getCarId() == myFixCar.getData().get(l).getCarId()){
+//                            myFixCar.getData().remove(l);
+//                        }
+//                    }
+//                }
+                Log.e("masdasdasd" , myFixCar.getData().size()+"");
+                for (int i = 0; i < myFixCar.getData().size(); i++) {
+                    getInfo(myFixCar.getData().get(i).getCarId() , myFixCar , i);
+                }
+
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+                Toast.makeText(Sm7.this, "失败!", Toast.LENGTH_SHORT).show();
+            }
+        });
+        Volley.newRequestQueue(getApplicationContext()).add(jor);
+    }
+    private void getInfo(int id , MyFixCar myFixCar , int position){
+        String url = "http://192.168.0.101:8085/dataInterface/Car/getInfo";
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                try {
+
+                    myFixCar.getData().get(position).setContent(new JSONObject(s).optJSONArray("data").optJSONObject(0).optString("content"));
+                    myFixCar.getData().get(position).setCarName(new JSONObject(s).optJSONArray("data").optJSONObject(0).optString("carName"));
+
+
+                    getProName(id , myFixCar , position);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+                Toast.makeText(Sm7.this, "失败", Toast.LENGTH_SHORT).show();
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String  , String> map = new HashMap<>();
+                map.put("id" , id+"");
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(stringRequest);
+    }
+
+    private void getProName(int id , MyFixCar myFixCar , int position){
+
+        String url = "http://192.168.0.101:8085/dataInterface/ProductionLine/search";
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                try {
+                    myFixCar.getData().get(position).setProductionLineName(new JSONObject(s).optJSONArray("data").optJSONObject(0).optString("productionLineName"));
+                    getCash(id , myFixCar , position);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String , String> map = new HashMap<>();
+                map.put("carId" , ""+id );
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(stringRequest);
+    }
+
+    private void getCash(int id , MyFixCar myFixCar , int position){
+
+        String url = "http://192.168.0.101:8085/dataInterface/CarInfo/getInfo";
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                try {
+                    Log.e("getCash" , s);
+                    myFixCar.getData().get(position).setCash(new JSONObject(s).optJSONArray("data").optJSONObject(0).optInt("repairGold"));
+
+                    myAdapter = new MyAdapter();
+                    sm_7_list.setAdapter(myAdapter);
+                    myAdapter.notifyDataSetChanged();
+                    //未完待续
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String , String> map = new HashMap<>();
+                map.put("id" , ""+id );
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(stringRequest);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    class MyAdapter extends BaseAdapter{
+        @Override
+        public int getCount() {
+            return myFixCar.getData().size();
+        }
+
+        @Override
+        public Object getItem(int i) {
+            return null;
+        }
+
+        @Override
+        public long getItemId(int i) {
+            return 0;
+        }
+
+        @Override
+        public View getView(int position, View context, ViewGroup viewGroup) {
+            if(context == null){
+                context = getLayoutInflater().inflate(R.layout.sm_7_includes , null);
+            }
+            TextView sm_id = context.findViewById(R.id.sm_id);
+            TextView sm_type = context.findViewById(R.id.sm_type);
+            TextView sm_descrption = context.findViewById(R.id.sm_descrption);
+            TextView sm_info = context.findViewById(R.id.sm_info);
+            TextView sm_cash = context.findViewById(R.id.sm_cash);
+
+            MyFixCar.Bean bean = myFixCar.getData().get(position);
+
+            sm_id.setText(bean.getCarId()+"");
+            sm_type.setText(bean.getCarName()+"");
+            sm_descrption.setText(bean.getContent()+"");
+            sm_info.setText(bean.getProductionLineName()+"");
+            sm_cash.setText(bean.getCash()+"元");
+
+            return context;
+        }
+    }
+
+    class MyFixCar{
+
+        public List<Bean> getData() {
+            return data;
+        }
+        List<Bean> data;
+
+        class Bean{
+            String productionLineName;
+            String content;
+            String carName;
+            int Cash;
+            int carId;
+
+            public int getCash() {
+                return Cash;
+            }
+
+            public void setCash(int cash) {
+                Cash = cash;
+            }
+
+            public String getCarName() {
+                return carName;
+            }
+
+            public void setCarName(String carName) {
+                this.carName = carName;
+            }
+
+            public String getProductionLineName() {
+                return productionLineName;
+            }
+
+            public void setProductionLineName(String productionLineName) {
+                this.productionLineName = productionLineName;
+            }
+
+            public String getContent() {
+                return content;
+            }
+
+            public void setContent(String content) {
+                this.content = content;
+            }
+
+
+            public int getCarId() {
+                return carId;
+            }
+
+            public void setCarId(int carId) {
+                this.carId = carId;
+            }
+        }
+    }
+}
