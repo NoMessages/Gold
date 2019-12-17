@@ -1,0 +1,401 @@
+!Rubbish)
+
+package com.lenovo.smarttraffic.ui.activity;
+
+import android.os.Bundle;
+import android.support.annotation.Nullable;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.google.gson.Gson;
+import com.google.gson.annotations.SerializedName;
+import com.lenovo.smarttraffic.R;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author Amoly
+ * @date 2019/4/11.
+ * description：
+ */
+
+public class Sm8 extends BaseActivity{
+    private  AllInfo allInfo;
+    private ListView sm_8_list;
+    private TextView sm_8_show;
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        InitView();
+        getAllCompty();
+        InitData();
+    }
+    @Override
+    protected int getLayout() {
+        return R.layout.sm_8;
+    }
+
+    private void InitView() {
+        initToolBar(findViewById(R.id.toolbar), true, getString(R.string.item8));
+        sm_8_list = findViewById(R.id.sm_8_list);
+        sm_8_show = findViewById(R.id.sm_8_show);
+    }
+
+    private void InitData() {
+        //首先查询全部成品仓库 http://192.168.31.222:8085/dataInterface/UserNormalCarStore/getAll  ---> carId userProductionLineId 查询其他信息  number直接保存
+        //  可以根据  id  http://192.168.31.222:8085/dataInterface/CarInfo/getInfo 在这个接口中 查找  area
+        //根据 userProductionLineId 查找  http://192.168.31.222:8085/dataInterface/ProductionLine/getInfo productionLineName
+
+        /**
+         * //查询全部车辆信息  http://192.168.31.222:8085/dataInterface/CarInfo/getAll 只能获取到  area 信息 自身返回了id carId
+         * // 查询全部  http://192.168.31.222:8085/dataInterface/UserNormalCarStore/getAll 可以获取 num carId 学生生产线Id
+         *  // carId 与 全部车辆 ID 比较 ， 默认都是合格， 一旦查到， 改成维修
+         *  //根据userProductionLineId http://192.168.31.222:8085/dataInterface/ProductionLine/getInfo productionLineName生产线名称
+         * // 还有个类型 http://192.168.0.101:8085/dataInterface/Car/getInfo
+         */
+        String url = "http://192.168.0.101:8085/dataInterface/CarInfo/getAll";
+
+        JsonObjectRequest jor = new JsonObjectRequest(url, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject jsonObject) {
+                Toast.makeText(Sm8.this, "请求成功", Toast.LENGTH_SHORT).show();
+                allInfo = new Gson().fromJson(jsonObject.toString(), AllInfo.class);
+                for (int i = 0; i < allInfo.getData().size(); i++) {
+                    getNum_Id( allInfo , i);//已经获取area //接下来获取其他shuju
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+                Toast.makeText(Sm8.this, "请求失败", Toast.LENGTH_SHORT).show();
+
+            }
+        });
+        Volley.newRequestQueue(getApplicationContext()).add(jor);
+    }
+
+    private void getNum_Id(AllInfo allInfo , int position){
+
+        String url = "http://192.168.0.101:8085/dataInterface/UserNormalCarStore/getAll";
+
+        JsonObjectRequest jor = new JsonObjectRequest(url, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject jsonObject) {
+                FixCar fixCar = new Gson().fromJson(jsonObject.toString(), FixCar.class);
+                //判断是否合格
+                allInfo.getData().get(position).setNum(fixCar.getDatas().get(position).getNum());
+                for (int i = 0; i < fixCar.getDatas().size(); i++) {
+                    if (allInfo.getData().get(position).getId() == fixCar.getDatas().get(i).getCarId()){
+                        allInfo.getData().get(position).setIsNice("维修");
+                        break;
+                    }else {
+                        allInfo.getData().get(position).setIsNice("合格");
+                    }
+                }
+                getProName(allInfo.getData().get(position).getId() , allInfo , position);
+
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+
+            }
+        });
+        Volley.newRequestQueue(getApplicationContext()).add(jor);
+    }
+
+    private void getProName(int id , AllInfo allInfo , int position){
+
+        String url = "http://192.168.0.101:8085/dataInterface/ProductionLine/getInfo";
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                try {
+                    allInfo.getData().get(position).setName(new JSONObject(s).optJSONArray("data").optJSONObject(0).optString("productionLineName"));
+                    getType(allInfo.getData().get(position).getId() , allInfo , position);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+
+            }
+        }) {
+
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String  , String> map = new HashMap<>();
+                map.put("id" , ""+id);
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(stringRequest);
+
+    }
+
+
+    private  void getType(int id , AllInfo allInfo ,int position){
+        String url = "http://192.168.0.101:8085/dataInterface/Car/getInfo";
+        StringRequest request = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                try {
+                    allInfo.getData().get(position).setType(new JSONObject(s).optJSONArray("data").optJSONObject(0).optString("carName"));
+                    sm_8_list.setAdapter(new MyAdapter());
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String , String > map = new HashMap<>();
+                map.put("id" , id+"");
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(request);
+    }
+
+    private void getAllCompty(){
+
+        String url = "http://192.168.0.101:8085/dataInterface/UserWorkInfo/getInfo";
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String s) {
+                try {
+                    sm_8_show.setText("成品车辆库存信息：共占地 : 3 , " + "库存容量" +new JSONObject(s).optJSONArray("data").optJSONObject(0).optInt("partCapacity") );
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError volleyError) {
+
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String  , String > map = new HashMap<>();
+                map.put("id" , "1");
+                return map;
+            }
+        };
+        Volley.newRequestQueue(getApplicationContext()).add(stringRequest);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    class AllInfo {
+
+        List<Bean2> data;
+
+        public List<Bean2> getData() {
+            return data;
+        }
+
+        public void setData(List<Bean2> data) {
+            this.data = data;
+        }
+
+        class Bean2 {
+            int id;
+            int num;
+            String name;
+            String type;
+
+            public String getType() {
+                return type;
+            }
+
+            public void setType(String type) {
+                this.type = type;
+            }
+
+            public String getName() {
+                return name;
+            }
+
+            public void setName(String name) {
+                this.name = name;
+            }
+
+            public int getNum() {
+                return num;
+            }
+
+            public void setNum(int num) {
+                this.num = num;
+            }
+
+            public int getId() {
+                return id;
+            }
+
+            public void setId(int id) {
+                this.id = id;
+            }
+
+            int area;
+            String isNice;
+
+            public int getArea() {
+                return area;
+            }
+
+            public void setArea(int area) {
+                this.area = area;
+            }
+
+            public String getIsNice() {
+                return isNice;
+            }
+
+            public void setIsNice(String isNice) {
+                this.isNice = isNice;
+            }
+        }
+    }
+
+    class FixCar{
+        /**
+         * status : 200
+         * message : SUCCESS
+         * data : [{"id":3450,"userWorkId":1,"userProductionLineId":2478,"carId":2,"num":1},{"id":3446,"userWorkId":1,"userProductionLineId":2478,"carId":2,"num":1},{"id":3445,"userWorkId":1,"userProductionLineId":2478,"carId":2,"num":1},{"id":3443,"userWorkId":1,"userProductionLineId":2478,"carId":2,"num":1},{"id":3441,"userWorkId":1,"userProductionLineId":2478,"carId":2,"num":1},{"id":3440,"userWorkId":1,"userProductionLineId":2478,"carId":2,"num":1},{"id":3437,"userWorkId":1,"userProductionLineId":2477,"carId":1,"num":24},{"id":3436,"userWorkId":1,"userProductionLineId":2477,"carId":1,"num":1},{"id":3434,"userWorkId":1,"userProductionLineId":2477,"carId":1,"num":1},{"id":3431,"userWorkId":1,"userProductionLineId":2477,"carId":1,"num":1}]
+         */
+        private List<Bean2> data;
+
+        public List<Bean2> getDatas() {
+            return data;
+        }
+
+        public void setDatas(List<Bean2> datas) {
+            this.data = data;
+        }
+
+        public class Bean2 {
+            /**
+             * id : 3450
+             * userWorkId : 1
+             * userProductionLineId : 2478
+             * carId : 2
+             * num : 1
+             */
+
+            private int id;
+            private int userWorkId;
+            private int userProductionLineId;
+            private int carId;
+            private int num;
+
+            public int getId() {
+                return id;
+            }
+
+            public void setId(int id) {
+                this.id = id;
+            }
+
+            public int getUserWorkId() {
+                return userWorkId;
+            }
+
+            public void setUserWorkId(int userWorkId) {
+                this.userWorkId = userWorkId;
+            }
+
+            public int getUserProductionLineId() {
+                return userProductionLineId;
+            }
+
+            public void setUserProductionLineId(int userProductionLineId) {
+                this.userProductionLineId = userProductionLineId;
+            }
+
+            public int getCarId() {
+                return carId;
+            }
+
+            public void setCarId(int carId) {
+                this.carId = carId;
+            }
+
+            public int getNum() {
+                return num;
+            }
+
+            public void setNum(int num) {
+                this.num = num;
+            }
+        }
+    }
+
+    class MyAdapter extends BaseAdapter{
+
+
+        @Override
+        public int getCount() {
+            return allInfo.getData().size();
+        }
+
+        @Override
+        public Object getItem(int i) {
+            return null;
+        }
+
+        @Override
+        public long getItemId(int i) {
+            return 0;
+        }
+
+        @Override
+        public View getView(int position, View context, ViewGroup viewGroup) {
+            if(context == null){
+                context = getLayoutInflater().inflate(R.layout.sm_8_includes,null);
+            }
+            TextView sm_8_id = context.findViewById(R.id.sm_8_id);
+            TextView sm_8_type = context.findViewById(R.id.sm_8_type);
+            TextView sm_number = context.findViewById(R.id.sm_number);
+            TextView sm_area = context.findViewById(R.id.sm_area);
+            TextView sm_info = context.findViewById(R.id.sm_info);
+            TextView sm_nice = context.findViewById(R.id.sm_nice);
+            AllInfo.Bean2 bean2 = allInfo.getData().get(position);
+            sm_8_id.setText(bean2.getId()+"");
+            sm_8_type.setText(bean2.getType()+"");
+            sm_number.setText(bean2.getNum()+"");
+            sm_area.setText(bean2.getNum()+"");
+            sm_info.setText(bean2.getName()+"");
+            sm_nice.setText(bean2.getIsNice()+"");
+            return context;
+        }
+    }
+}
